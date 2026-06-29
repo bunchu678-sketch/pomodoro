@@ -294,7 +294,6 @@ function tick() {
     if (mode === 'work') {
       sessionsToday++;
       cycleCount = (cycleCount + 1) % (MAX_DOTS + 1);
-      if (cycleCount === 0) cycleCount = 0;
       statsEl.textContent = `今日: ${sessionsToday} セッション完了`;
       updateDots();
       showToast('お疲れ様！休憩しましょう 🍵');
