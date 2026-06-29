@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ポモドーロタイマー</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #1a1a2e;
+    color: #eee;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    gap: 32px;
+  }
+
+  h1 { font-size: 1.4rem; letter-spacing: 0.2em; opacity: 0.6; font-weight: 300; }
+
+  .mode-tabs {
+    display: flex;
+    gap: 8px;
+  }
+
+  .tab {
+    padding: 8px 20px;
+    border-radius: 20px;
+    border: none;
+    background: transparent;
+    color: #aaa;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+  }
+
+  .tab.active {
+    background: #e94560;
+    color: #fff;
+  }
+
+  .clock-ring {
+    position: relative;
+    width: 280px;
+    height: 280px;
+  }
+
+  .clock-ring svg {
+    transform: rotate(-90deg);
+    width: 100%;
+    height: 100%;
+  }
+
+  .ring-bg { fill: none; stroke: #2d2d4e; stroke-width: 10; }
+  .ring-progress {
+    fill: none;
+    stroke: #e94560;
+    stroke-width: 10;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1s linear, stroke 0.4s;
+  }
+
+  .clock-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+  }
+
+  .time-display {
+    font-size: 4rem;
+    font-weight: 200;
+    letter-spacing: 0.05em;
+  }
+
+  .mode-label {
+    font-size: 0.85rem;
+    opacity: 0.5;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  .controls {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .btn-main {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: none;
+    background: #e94560;
+    color: #fff;
+    font-size: 1.8rem;
+    cursor: pointer;
+    transition: transform 0.1s, background 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .btn-main:hover { transform: scale(1.07); }
+  .btn-main:active { transform: scale(0.96); }
+
+  .btn-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 2px solid #333;
+    background: transparent;
+    color: #aaa;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .btn-icon:hover { border-color: #e94560; color: #e94560; }
+
+  .sessions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #333;
+    transition: background 0.3s;
+  }
+
+  .dot.done { background: #e94560; }
+
+  .stats {
+    font-size: 0.8rem;
+    opacity: 0.4;
+    letter-spacing: 0.1em;
+  }
+
+  /* break mode */
+  body.break .ring-progress { stroke: #0f3460; }
+  body.break .tab.active { background: #0f3460; }
+  body.break .btn-main { background: #0f3460; }
+  body.break .btn-icon:hover { border-color: #0f3460; color: #0f3460; }
+  body.break .dot.done { background: #0f3460; }
+  body.break { background: #0d1b2a; }
+
+  .toast {
+    position: fixed;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: #e94560;
+    color: #fff;
+    padding: 12px 28px;
+    border-radius: 24px;
+    font-size: 0.9rem;
+    transition: transform 0.4s ease;
+    pointer-events: none;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  body.break .toast { background: #0f3460; }
+</style>
+</head>
+<body>
+
+<h1>POMODORO</h1>
+
+<div class="mode-tabs">
+  <button class="tab active" id="tabWork">作業</button>
+  <button class="tab" id="tabShort">短い休憩</button>
+  <button class="tab" id="tabLong">長い休憩</button>
+</div>
+
+<div class="clock-ring">
+  <svg viewBox="0 0 100 100">
+    <circle class="ring-bg" cx="50" cy="50" r="44"/>
+    <circle class="ring-progress" id="ring" cx="50" cy="50" r="44"
+      stroke-dasharray="276.46"
+      stroke-dashoffset="0"/>
+  </svg>
+  <div class="clock-center">
+    <div class="time-display" id="display">25:00</div>
+    <div class="mode-label" id="modeLabel">作業中</div>
+  </div>
+</div>
+
+<div class="controls">
+  <button class="btn-icon" id="btnReset" title="リセット">↺</button>
+  <button class="btn-main" id="btnPlay">▶</button>
+  <button class="btn-icon" id="btnSkip" title="スキップ">⏭</button>
+</div>
+
+<div class="sessions" id="dots"></div>
+<div class="stats" id="stats">今日: 0 セッション完了</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const MODES = {
+  work:  { label: '作業中',   minutes: 25, break: false },
+  short: { label: '短い休憩', minutes: 5,  break: true  },
+  long:  { label: '長い休憩', minutes: 15, break: true  },
+};
+
+const CIRCUMFERENCE = 276.46;
+const MAX_DOTS = 4;
+
+let mode = 'work';
+let totalSeconds = MODES.work.minutes * 60;
+let remaining = totalSeconds;
+let running = false;
+let interval = null;
+let sessionsToday = 0;
+let cycleCount = 0;
+
+const display  = document.getElementById('display');
+const modeLabel= document.getElementById('modeLabel');
+const ring     = document.getElementById('ring');
+const btnPlay  = document.getElementById('btnPlay');
+const btnReset = document.getElementById('btnReset');
+const btnSkip  = document.getElementById('btnSkip');
+const dotsEl   = document.getElementById('dots');
+const statsEl  = document.getElementById('stats');
+const toast    = document.getElementById('toast');
+
+function fmt(s) {
+  const m = Math.floor(s / 60);
+  return `${String(m).padStart(2,'0')}:${String(s % 60).padStart(2,'0')}`;
+}
+
+function updateRing() {
+  const pct = remaining / totalSeconds;
+  ring.style.strokeDashoffset = CIRCUMFERENCE * (1 - pct);
+}
+
+function updateDots() {
+  dotsEl.innerHTML = '';
+  for (let i = 0; i < MAX_DOTS; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i < cycleCount ? ' done' : '');
+    dotsEl.appendChild(d);
+  }
+}
+
+function render() {
+  display.textContent = fmt(remaining);
+  document.title = `${fmt(remaining)} — ${MODES[mode].label}`;
+  updateRing();
+}
+
+function setMode(m) {
+  mode = m;
+  stop();
+  totalSeconds = MODES[m].minutes * 60;
+  remaining = totalSeconds;
+  modeLabel.textContent = MODES[m].label;
+  document.body.classList.toggle('break', MODES[m].break);
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab' + {work:'Work', short:'Short', long:'Long'}[m]).classList.add('active');
+  ring.style.stroke = MODES[m].break ? '#0f3460' : '#e94560';
+  render();
+}
+
+function stop() {
+  clearInterval(interval);
+  running = false;
+  btnPlay.textContent = '▶';
+}
+
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2800);
+}
+
+function tick() {
+  remaining--;
+  render();
+  if (remaining <= 0) {
+    stop();
+    if (mode === 'work') {
+      sessionsToday++;
+      cycleCount = (cycleCount + 1) % (MAX_DOTS + 1);
+      if (cycleCount === 0) cycleCount = 0;
+      statsEl.textContent = `今日: ${sessionsToday} セッション完了`;
+      updateDots();
+      showToast('お疲れ様！休憩しましょう 🍵');
+      if (sessionsToday % 4 === 0) setMode('long');
+      else setMode('short');
+    } else {
+      showToast('休憩終了！集中しましょう 💪');
+      cycleCount = mode === 'long' ? 0 : cycleCount;
+      updateDots();
+      setMode('work');
+    }
+    try { new Audio().play(); } catch(e) {}
+  }
+}
+
+btnPlay.addEventListener('click', () => {
+  if (running) { stop(); }
+  else {
+    running = true;
+    btnPlay.textContent = '⏸';
+    interval = setInterval(tick, 1000);
+  }
+});
+
+btnReset.addEventListener('click', () => {
+  stop();
+  remaining = totalSeconds;
+  render();
+});
+
+btnSkip.addEventListener('click', () => {
+  stop();
+  remaining = 0;
+  tick();
+});
+
+document.getElementById('tabWork').addEventListener('click',  () => setMode('work'));
+document.getElementById('tabShort').addEventListener('click', () => setMode('short'));
+document.getElementById('tabLong').addEventListener('click',  () => setMode('long'));
+
+updateDots();
+render();
+</script>
+</body>
+</html>
